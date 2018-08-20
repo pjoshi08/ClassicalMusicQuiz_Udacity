@@ -16,21 +16,25 @@
 
 package com.example.android.classicalmusicquiz;
 
+import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.support.v4.app.NotificationCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v4.media.session.MediaButtonReceiver;
 import android.support.v4.media.session.MediaSessionCompat;
 import android.support.v4.media.session.PlaybackStateCompat;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.app.NotificationCompat;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
@@ -69,7 +73,7 @@ public class QuizActivity extends AppCompatActivity implements View.OnClickListe
     private Button[] mButtons;
     private SimpleExoPlayer mExoPlayer;
     private SimpleExoPlayerView mPlayerView;
-    private MediaSessionCompat mMediaSession;
+    private static MediaSessionCompat mMediaSession;
     private PlaybackStateCompat.Builder mStateBuilder;
     private NotificationManager mNotificationManager;
 
@@ -195,7 +199,6 @@ public class QuizActivity extends AppCompatActivity implements View.OnClickListe
      * @param state The PlaybackState of the MediaSession.
      */
     private void showNotification(PlaybackStateCompat state) {
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this);
 
         int icon;
         String play_pause;
@@ -221,20 +224,28 @@ public class QuizActivity extends AppCompatActivity implements View.OnClickListe
         PendingIntent contentPendingIntent = PendingIntent.getActivity
                 (this, 0, new Intent(this, QuizActivity.class), 0);
 
-        builder.setContentTitle(getString(R.string.guess))
-                .setContentText(getString(R.string.notification_text))
-                .setContentIntent(contentPendingIntent)
-                .setSmallIcon(R.drawable.ic_music_note)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .addAction(restartAction)
-                .addAction(playPauseAction)
-                .setStyle(new NotificationCompat.MediaStyle()
-                        .setMediaSession(mMediaSession.getSessionToken())
-                        .setShowActionsInCompactView(0,1));
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(
+                    this, "0");
 
+            builder.setContentTitle(getString(R.string.guess))
+                    .setContentText(getString(R.string.notification_text))
+                    .setContentIntent(contentPendingIntent)
+                    .setSmallIcon(R.drawable.ic_music_note)
+                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                    .addAction(restartAction)
+                    .addAction(playPauseAction)
+                    .setStyle(new android.support.v4.media.app.NotificationCompat.MediaStyle()
+                            .setMediaSession(mMediaSession.getSessionToken())
+                            .setShowActionsInCompactView(0, 1));
 
-        mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        mNotificationManager.notify(0, builder.build());
+            NotificationChannel channel = new NotificationChannel("0",
+                    "ClassicalMusicQuiz", NotificationManager.IMPORTANCE_DEFAULT);
+
+            mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            mNotificationManager.createNotificationChannel(channel);
+            mNotificationManager.notify(0, builder.build());
+        }
     }
 
 
@@ -359,6 +370,7 @@ public class QuizActivity extends AppCompatActivity implements View.OnClickListe
      */
     @Override
     protected void onDestroy() {
+        mNotificationManager.cancelAll();
         super.onDestroy();
         releasePlayer();
         mMediaSession.setActive(false);
@@ -427,6 +439,16 @@ public class QuizActivity extends AppCompatActivity implements View.OnClickListe
         }
     }
 
-    // TODO (1): Create a static inner class that extends Broadcast Receiver and implement the onReceive() method.
-    //TODO (2): Call MediaButtonReceiver.handleIntent and pass in the incoming intent as well as the MediaSession object to forward the intent to the MediaSession.Callbacks.
+    // COMPLETED (1): Create a static inner class that extends Broadcast Receiver and implement the onReceive() method.
+    // COMPLETED (2): Call MediaButtonReceiver.handleIntent and pass in the incoming intent as well as the MediaSession
+    // object to forward the intent to the MediaSession.Callbacks.
+    public static class MediaReceiver extends BroadcastReceiver{
+
+        public MediaReceiver(){}
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            MediaButtonReceiver.handleIntent(mMediaSession, intent);
+        }
+    }
 }
